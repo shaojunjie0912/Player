@@ -1,0 +1,20 @@
+{
+  "dependencies": [
+    {
+      "name": "ffmpeg",
+      "features": [
+        "avcodec",
+        "avdevice",
+        "avfilter",
+        "avformat",
+        "swresample",
+        "swscale",
+        "x264",
+        "x265",
+        "fdk-aac"
+      ]
+    },
+    "sdl2",
+    "fmt"
+  ]
+}
