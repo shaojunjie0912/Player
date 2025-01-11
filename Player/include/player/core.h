@@ -73,7 +73,6 @@ struct VideoState {
 
     // ================== Audio ==================
     AVFrame audio_frame_;
-    // uint8_t audio_buffer_[(kMaxAudioFrameSize * 3) / 2];// NOTE: 换成指针了
     uint8_t *audio_buffer_;
     uint32_t audio_buffer_size_;
     uint32_t audio_buffer_index_;
@@ -115,17 +114,24 @@ struct VideoState {
 
 // ================== PacketQueue Functions ==================
 int InitPacketQueue(PacketQueue *q);
+
 int PutPacketQueueInternal(PacketQueue *q, AVPacket *pkt);
+
 int PutPacketQueue(PacketQueue *q, AVPacket *pkt);
+
 int GetPacketQueue(PacketQueue *q, AVPacket *pkt, int block);
+
 void FlushPacketQueue(PacketQueue *q);
+
 void DestoryPacketQueue(PacketQueue *q);
 
 // ================== FrameQueue Functions ==================
 int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last);
 
-void PushFrameQueue(FrameQueue *f);  // 将写索引后移
-void NextFrameQueue(FrameQueue *f);  // 将读索引后移
+void MoveWriteIndex(FrameQueue *f);  // 将写索引后移
+
+void MoveReadIndex(FrameQueue *f);  // 将读索引后移
 
 Frame *PeekWritableFrameQueue(FrameQueue *f);
+
 Frame *PeekFrameQueue(FrameQueue *f);

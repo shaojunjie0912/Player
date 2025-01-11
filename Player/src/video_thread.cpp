@@ -55,7 +55,7 @@ void DisplayVideo(VideoState* video_state) {
     SDL_RenderPresent(renderer);
 
     // 释放视频帧
-    NextFrameQueue(&video_state->video_frame_queue_);
+    MoveReadIndex(&video_state->video_frame_queue_);
 }
 
 void VideoRefreshTimer(void* user_data) {
@@ -154,7 +154,7 @@ int QueuePicture(VideoState* video_state, AVFrame* src_frame, double pts, double
     SetDefaultWindowSize(vp->width_, vp->height_, vp->sar_);
 
     av_frame_move_ref(vp->frame_, src_frame);
-    PushFrameQueue(&video_state->video_frame_queue_);
+    MoveWriteIndex(&video_state->video_frame_queue_);
     return 0;
 }
 

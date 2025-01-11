@@ -38,7 +38,7 @@ VideoState* OpenStream(std::string const& file_name) {
         return nullptr;
     }
 
-    RefreshSchedule(video_state, 40);  // TODO: 作用?
+    RefreshSchedule(video_state, 40);  // HACK: 注释后没有视频了
 
     return video_state;
 }

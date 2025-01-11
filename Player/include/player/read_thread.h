@@ -22,5 +22,6 @@ extern "C" {
 // 音频线程
 #include <player/audio_thread.h>
 
-int ReadThread(void* arg);
 VideoState* OpenStream(std::string const& file_name);
+
+int ReadThread(void* arg);

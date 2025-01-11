@@ -120,7 +120,7 @@ Frame *PeekWritableFrameQueue(FrameQueue *f) {
 // HACK: 第一次 Peek 读的时候 rindex + rindex_shown = 0 + 0
 // 然后单独递增 rindex_shown 并 return
 // 下一次 Peek 读的时候 rindex + rindex_shown = 0 + 1
-void NextFrameQueue(FrameQueue *f) {
+void MoveReadIndex(FrameQueue *f) {
     std::unique_lock lk{f->mtx_};
     if (f->keep_last_ && !f->rindex_shown_) {
         f->rindex_shown_ = 1;
@@ -135,7 +135,7 @@ void NextFrameQueue(FrameQueue *f) {
 }
 
 // 偏移写索引 windex
-void PushFrameQueue(FrameQueue *f) {
+void MoveWriteIndex(FrameQueue *f) {
     std::unique_lock lk{f->mtx_};
     if (++f->windex_ == f->max_size_) {
         f->windex_ = 0;
