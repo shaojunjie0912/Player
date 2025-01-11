@@ -9,17 +9,6 @@
             "program": "${command:cmake.launchTargetPath}",
             "args": [
                 "data/k-on.mp4",
-                // "data/lalal.aac"
-                // "data/data.h264",
-                // "data/data.aac",
-                // "data/k-on!.mov",
-                // "60",
-                // "120"
-                // "libx264"
-                // "data/gray_pics/gray",
-                // "data/color_pics/color",
-                // --------------- test ---------------
-                // "data/tests/meme.bin",
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

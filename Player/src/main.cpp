@@ -1,21 +1,14 @@
-#include <player/av_state.h>
-#include <player/demux.h>
+#include <player/read_thread.h>
 
-#include <iostream>
 #include <string>
-
-using std::cout;
-using std::endl;
-
-constexpr int kDefaultWidth = 640;
-constexpr int kDefaultHeight = 480;
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;
 
-int main(int argc, char* argv[]) {
-    int ret = 0;  // 返回值
+// TODO: 很多break存在内存泄漏隐患
+// TODO: return 的话倒也轻松
 
+int main(int argc, char* argv[]) {
     av_log_set_level(AV_LOG_DEBUG);
 
     if (argc < 2) {
@@ -41,7 +34,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    AVState* av_state = OpenStream(input_file);
+    VideoState* av_state = OpenStream(input_file);
 
     if (!av_state) {
         av_log(NULL, AV_LOG_ERROR, "OpenStream failed\n");

@@ -1,8 +1,11 @@
 #pragma once
 
+#include <string>
+
 extern "C" {
 #include <SDL2/SDL.h>
 #include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 #include <libavutil/fifo.h>
 }
 
@@ -20,10 +23,7 @@ struct Frame {
 };
 
 struct MyAVPacketList {
-    /* 待解码数据 */
     AVPacket *pkt;
-    /* pkt序列号 */
-    // int serial;
 };
 
 struct PacketQueue {
@@ -31,10 +31,6 @@ struct PacketQueue {
     int nb_packets;   /* 队列中当前的packet数 */
     int size;         /* 队列所有节点占用的总内存大小 */
     int64_t duration; /* 队列中所有节点的合计时长 */
-
-    // int abort_request; /* 终止队列操作信号，用于安全快速退出播放 */
-    // int serial;        /* 序列号，和MyAVPacketList中的序列号作用相同，但改变的时序略有不同 */
-
     SDL_mutex *mutex;
     SDL_cond *cond;
 };
@@ -50,6 +46,66 @@ struct FrameQueue {
     SDL_mutex *mutex;
     SDL_cond *cond;
     PacketQueue *pktq; /* 指向对应的PacketQueue，FrameQueue里面的数据就是这个队列解码出来的 */
+};
+
+struct VideoState {
+    std::string file_name_;
+    AVFormatContext *format_context_;
+
+    // ================== Audio & Video ==================
+    int video_stream_idx_{-1};
+    int audio_stream_idx_{-1};
+
+    AVStream *audio_stream_;
+    AVStream *video_stream_;
+
+    AVCodecContext *audio_codec_context_;
+    AVCodecContext *video_codec_context_;
+
+    PacketQueue audio_packet_queue_;
+    PacketQueue video_packet_queue_;
+
+    AVPacket audio_packet_;
+    AVPacket video_packet_;
+
+    // ================== Audio ==================
+    AVFrame audio_frame_;
+    // uint8_t audio_buffer_[(kMaxAudioFrameSize * 3) / 2];// NOTE: 换成指针了
+    uint8_t *audio_buffer_;
+    uint32_t audio_buffer_size_;
+    uint32_t audio_buffer_index_;
+    uint8_t *audio_paket_data_;
+    int audio_packet_size_;
+    struct SwrContext *audio_swr_context_;
+
+    // ================== Video ==================
+    struct SwsContext *video_sws_context_;
+
+    FrameQueue video_frame_queue_;  // 解码后的视频帧队列
+
+    // ================== SDL ==================
+    int y_top_;   // 顶部边界(窗口上面要留多少空间)
+    int x_left_;  // 左边界(窗口左边要留多少空间)
+    int width_;   // 窗口宽度
+    int height_;  // 窗口高度
+
+    SDL_Texture *texture_;
+
+    // ================== Sync(固定主音频) ==================
+    double frame_timer_;              // 最后一帧播放的时刻(现在视频播放了多长时间)
+    double frame_last_delay_;         // 最后一帧滤波延迟(上一次渲染视频帧delay时间)
+    double video_current_pts_;        // 当前 pts
+    int64_t video_current_pts_time_;  // 系统时间
+    double frame_last_pts_;           // 上一帧的 pts
+
+    double audio_clock_;
+    double video_clock_;
+
+    // ================== Misc ==================
+    SDL_Thread *read_tid_;
+    SDL_Thread *decode_tid_;
+
+    bool quit_;
 };
 
 int InitPacketQueue(PacketQueue *q);
