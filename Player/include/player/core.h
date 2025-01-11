@@ -1,5 +1,7 @@
 #pragma once
 
+#include <condition_variable>
+#include <mutex>
 #include <string>
 
 extern "C" {
@@ -16,36 +18,37 @@ struct MyAVPacketList {
 };
 
 struct PacketQueue {
-    AVFifo *pkt_list; /* ffmpeg封装的队列数据结构，里面的数据对象是MyAVPacketList */
-    int nb_packets;   /* 队列中当前的packet数 */
-    int size;         /* 队列所有节点占用的总内存大小 */
-    int64_t duration; /* 队列中所有节点的合计时长 */
-    SDL_mutex *mutex;
-    SDL_cond *cond;
+    AVFifo *pkt_list_; /* ffmpeg封装的队列数据结构，里面的数据对象是MyAVPacketList */
+    int nb_packets_;   /* 队列中当前的packet数 */
+    int size_;         /* 队列所有节点占用的总内存大小 */
+    int64_t duration_; /* 队列中所有节点的合计时长 */
+    std::mutex mtx_;
+    std::condition_variable cv_;  // 队列是否为空的条件变量
 };
 
 struct Frame {
-    AVFrame *frame;
-    double pts;      /* presentation timestamp for the frame */
-    double duration; /* estimated duration of the frame */
-    int64_t pos;     /* byte position of the frame in the input file */
-    int width;
-    int height;
-    int format;
-    AVRational sar;
+    AVFrame *frame_;
+    double pts_;      /* presentation timestamp for the frame */
+    double duration_; /* estimated duration of the frame */
+    int64_t pos_;     /* byte position of the frame in the input file */
+    int width_;
+    int height_;
+    int format_;
+    AVRational sar_;
 };
 
 struct FrameQueue {
-    Frame queue[kFrameQueueSize]; /* 用于存放帧数据的队列 */
-    int rindex;                   /* 读索引 */
-    int windex;                   /* 写索引 */
-    int size;                     /* 队列中的帧数 */
-    int max_size;                 /* 队列最大缓存的帧数 */
-    int keep_last;                /* 播放后是否在队列中保留上一帧不销毁 */
-    int rindex_shown;             /* keep_last的实现，读的时候实际上读的是rindex + rindex_shown，分析见下 */
-    SDL_mutex *mutex;
-    SDL_cond *cond;
-    PacketQueue *pktq;  // 关联的 PacketQueue
+    Frame queue_[kFrameQueueSize]; /* 用于存放帧数据的队列 */
+    int rindex_;                   /* 读索引 */
+    int windex_;                   /* 写索引 */
+    int size_;                     /* 队列中的帧数 */
+    int max_size_;                 /* 队列最大缓存的帧数 */
+    int keep_last_;                /* 播放后是否在队列中保留上一帧不销毁 */
+    int rindex_shown_;             /* keep_last的实现，读的时候实际上读的是rindex + rindex_shown，分析见下 */
+    std::mutex mtx_;
+    std::condition_variable cv_notfull_;   // 队列是否为空的条件变量
+    std::condition_variable cv_notempty_;  // 队列是否为满的条件变量
+    PacketQueue *pktq_;                    // 关联的 PacketQueue
 };
 
 struct VideoState {
@@ -120,8 +123,9 @@ void DestoryPacketQueue(PacketQueue *q);
 
 // ================== FrameQueue Functions ==================
 int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last);
-Frame *FrameQueuePeekWritable(FrameQueue *f);
 
-void PushFrameQueue(FrameQueue *f);
+void PushFrameQueue(FrameQueue *f);  // 将写索引后移
+void NextFrameQueue(FrameQueue *f);  // 将读索引后移
+
+Frame *PeekWritableFrameQueue(FrameQueue *f);
 Frame *PeekFrameQueue(FrameQueue *f);
-void PopFrameQueue(FrameQueue *f);

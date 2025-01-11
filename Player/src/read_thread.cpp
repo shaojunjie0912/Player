@@ -97,8 +97,8 @@ int ReadThread(void* arg) {
         }
 
         // 限制队列大小
-        if (video_state->audio_packet_queue_.size > kMaxQueueSize ||
-            video_state->video_packet_queue_.size > kMaxQueueSize) {
+        if (video_state->audio_packet_queue_.size_ > kMaxQueueSize ||
+            video_state->video_packet_queue_.size_ > kMaxQueueSize) {
             SDL_Delay(10);  // 如果队列满了, 等待 10 ms, 等消费者消费
             continue;
         }

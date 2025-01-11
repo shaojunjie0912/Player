@@ -28,7 +28,7 @@ void DisplayVideo(VideoState* video_state) {
     }
     Frame* vp = PeekFrameQueue(&video_state->video_frame_queue_);
 
-    AVFrame* frame = vp->frame;
+    AVFrame* frame = vp->frame_;
 
     if (!video_state->texture_) {
         int width = frame->width;
@@ -45,7 +45,7 @@ void DisplayVideo(VideoState* video_state) {
     // 计算显示的位置
     SDL_Rect rect;
     CalculateDisplayRect(&rect, video_state->x_left_, video_state->y_top_, video_state->width_, video_state->height_,
-                         vp->width, vp->height, vp->sar);
+                         vp->width_, vp->height_, vp->sar_);
 
     // 渲染
     SDL_UpdateYUVTexture(video_state->texture_, nullptr, frame->data[0], frame->linesize[0], frame->data[1],
@@ -55,7 +55,7 @@ void DisplayVideo(VideoState* video_state) {
     SDL_RenderPresent(renderer);
 
     // 释放视频帧
-    PopFrameQueue(&video_state->video_frame_queue_);  // 将已经渲染好的一帧从队列中移除
+    NextFrameQueue(&video_state->video_frame_queue_);
 }
 
 void VideoRefreshTimer(void* user_data) {
@@ -64,18 +64,18 @@ void VideoRefreshTimer(void* user_data) {
 
     double actual_delay, delay, sync_threshold, ref_clock, diff;
 
-    if (video_state->video_stream_) {                     // 如果存在视频流
-        if (video_state->video_frame_queue_.size == 0) {  // 如果视频帧队列为空
-            RefreshSchedule(video_state, 1);              // 快速刷新直到发现有数据
+    if (video_state->video_stream_) {                      // 如果存在视频流
+        if (video_state->video_frame_queue_.size_ == 0) {  // 如果视频帧队列为空
+            RefreshSchedule(video_state, 1);               // 快速刷新直到发现有数据
         } else {
             vp = PeekFrameQueue(&video_state->video_frame_queue_);
-            video_state->video_current_pts_ = vp->pts;
+            video_state->video_current_pts_ = vp->pts_;
             video_state->video_current_pts_time_ = av_gettime();
             if (video_state->frame_last_pts_ == 0) {
                 delay = 0;
             } else {
                 // the pts from last time
-                delay = vp->pts - video_state->frame_last_pts_;
+                delay = vp->pts_ - video_state->frame_last_pts_;
             }
 
             if (delay <= 0 || delay >= 1.0) {
@@ -84,12 +84,12 @@ void VideoRefreshTimer(void* user_data) {
             }
             // save for next time
             video_state->frame_last_delay_ = delay;
-            video_state->frame_last_pts_ = vp->pts;
+            video_state->frame_last_pts_ = vp->pts_;
 
             // 更新 delay 同步到音频
             // ref_clock = GetMasterClock(video_state);  // 获取主时钟(这里就是音频时钟)
             ref_clock = video_state->audio_clock_;  // NOTE: 我直接写死了
-            diff = vp->pts - ref_clock;
+            diff = vp->pts_ - ref_clock;
 
             // Skip or repeat the frame. Take delay into account
             // FFPlay still doesn't "know if this is the best guess."
@@ -138,22 +138,22 @@ void SdlEventLoop(VideoState* video_state) {
 
 int QueuePicture(VideoState* video_state, AVFrame* src_frame, double pts, double duration, int64_t pos) {
     Frame* vp;
-    if (!(vp = FrameQueuePeekWritable(&video_state->video_frame_queue_))) {
-        av_log(nullptr, AV_LOG_ERROR, "FrameQueuePeekWritable failed\n");
+    if (!(vp = PeekWritableFrameQueue(&video_state->video_frame_queue_))) {
+        av_log(nullptr, AV_LOG_ERROR, "PeekWritableFrameQueue failed\n");
         return -1;
     }
-    vp->sar = src_frame->sample_aspect_ratio;
-    vp->width = src_frame->width;
-    vp->height = src_frame->height;
-    vp->format = src_frame->format;
+    vp->sar_ = src_frame->sample_aspect_ratio;
+    vp->width_ = src_frame->width;
+    vp->height_ = src_frame->height;
+    vp->format_ = src_frame->format;
 
-    vp->pts = pts;
-    vp->duration = duration;
-    vp->pos = pos;
+    vp->pts_ = pts;
+    vp->duration_ = duration;
+    vp->pos_ = pos;
 
-    SetDefaultWindowSize(vp->width, vp->height, vp->sar);
+    SetDefaultWindowSize(vp->width_, vp->height_, vp->sar_);
 
-    av_frame_move_ref(vp->frame, src_frame);
+    av_frame_move_ref(vp->frame_, src_frame);
     PushFrameQueue(&video_state->video_frame_queue_);
     return 0;
 }

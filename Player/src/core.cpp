@@ -5,18 +5,8 @@
 
 int InitPacketQueue(PacketQueue *q) {
     memset(q, 0, sizeof(PacketQueue));
-    q->pkt_list = av_fifo_alloc2(1, sizeof(MyAVPacketList), AV_FIFO_FLAG_AUTO_GROW);
-    if (!q->pkt_list) {
-        return AVERROR(ENOMEM);
-    }
-    q->mutex = SDL_CreateMutex();
-    if (!q->mutex) {
-        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
-        return AVERROR(ENOMEM);
-    }
-    q->cond = SDL_CreateCond();
-    if (!q->cond) {
-        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
+    q->pkt_list_ = av_fifo_alloc2(1, sizeof(MyAVPacketList), AV_FIFO_FLAG_AUTO_GROW);
+    if (!q->pkt_list_) {
         return AVERROR(ENOMEM);
     }
     return 0;
@@ -29,19 +19,19 @@ int PutPacketQueueInternal(PacketQueue *q, AVPacket *pkt) {
     pkt1.pkt = pkt;
 
     // 写进队列
-    ret = av_fifo_write(q->pkt_list, &pkt1, 1);
+    ret = av_fifo_write(q->pkt_list_, &pkt1, 1);
     if (ret < 0) {
         return ret;
     }
-    q->nb_packets++;
-    q->size += pkt1.pkt->size + sizeof(pkt1);
-    q->duration += pkt1.pkt->duration;
-    // 通知
-    SDL_CondSignal(q->cond);
+    ++q->nb_packets_;
+    q->size_ += pkt1.pkt->size + sizeof(pkt1);
+    q->duration_ += pkt1.pkt->duration;
+    q->cv_.notify_one();  // 通知等待的线程
     return 0;
 }
 
 int PutPacketQueue(PacketQueue *q, AVPacket *pkt) {
+    std::unique_lock lk{q->mtx_};
     int ret;
     AVPacket *pkt1{av_packet_alloc()};  // HACK: 分配新内存
     if (!pkt1) {
@@ -50,9 +40,7 @@ int PutPacketQueue(PacketQueue *q, AVPacket *pkt) {
     }
     av_packet_move_ref(pkt1, pkt);
 
-    SDL_LockMutex(q->mutex);
     ret = PutPacketQueueInternal(q, pkt1);
-    SDL_UnlockMutex(q->mutex);
 
     if (ret < 0) {
         av_packet_free(&pkt1);
@@ -62,16 +50,14 @@ int PutPacketQueue(PacketQueue *q, AVPacket *pkt) {
 }
 
 int GetPacketQueue(PacketQueue *q, AVPacket *pkt, int block) {
+    std::unique_lock lk{q->mtx_};
     MyAVPacketList pkt1;
     int ret;
-
-    SDL_LockMutex(q->mutex);
-
     for (;;) {
-        if (av_fifo_read(q->pkt_list, &pkt1, 1) >= 0) {
-            q->nb_packets--;
-            q->size -= pkt1.pkt->size + sizeof(pkt1);
-            q->duration -= pkt1.pkt->duration;
+        if (av_fifo_read(q->pkt_list_, &pkt1, 1) >= 0) {
+            --q->nb_packets_;
+            q->size_ -= pkt1.pkt->size + sizeof(pkt1);
+            q->duration_ -= pkt1.pkt->duration;
             av_packet_move_ref(pkt, pkt1.pkt);
             av_packet_free(&pkt1.pkt);
             ret = 1;
@@ -80,65 +66,54 @@ int GetPacketQueue(PacketQueue *q, AVPacket *pkt, int block) {
             ret = 0;
             break;
         } else {
-            SDL_CondWait(q->cond, q->mutex);
+            q->cv_.wait(lk);
         }
     }
-    SDL_UnlockMutex(q->mutex);
     return ret;
 }
 
 void FlushPacketQueue(PacketQueue *q) {
+    std::unique_lock lk{q->mtx_};
     MyAVPacketList pkt1;
-
-    SDL_LockMutex(q->mutex);
-    while (av_fifo_read(q->pkt_list, &pkt1, 1) >= 0) {
+    while (av_fifo_read(q->pkt_list_, &pkt1, 1) >= 0) {
         av_packet_free(&pkt1.pkt);
     }
-    q->nb_packets = 0;
-    q->size = 0;
-    q->duration = 0;
-    SDL_UnlockMutex(q->mutex);
+    q->nb_packets_ = 0;
+    q->size_ = 0;
+    q->duration_ = 0;
 }
 
 void DestoryPacketQueue(PacketQueue *q) {
     FlushPacketQueue(q);
-    av_fifo_freep2(&q->pkt_list);
-    SDL_DestroyMutex(q->mutex);
-    SDL_DestroyCond(q->cond);
+    av_fifo_freep2(&q->pkt_list_);
 }
 
 int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last) {
     int i;
     memset(f, 0, sizeof(FrameQueue));
-    if (!(f->mutex = SDL_CreateMutex())) {
-        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
-        return AVERROR(ENOMEM);
-    }
-    if (!(f->cond = SDL_CreateCond())) {
-        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
-        return AVERROR(ENOMEM);
-    }
-    f->pktq = pktq;
-    f->max_size = FFMIN(max_size, kFrameQueueSize);
-    f->keep_last = !!keep_last;
-    for (i = 0; i < f->max_size; i++) {
+    f->pktq_ = pktq;
+    f->max_size_ = FFMIN(max_size, kFrameQueueSize);
+    f->keep_last_ = !!keep_last;
+    for (i = 0; i < f->max_size_; i++) {
         // 为 FrameQueue 中的 max_size 个 Frame 分配内存
-        if (!(f->queue[i].frame = av_frame_alloc())) {
+        if (!(f->queue_[i].frame_ = av_frame_alloc())) {
             return AVERROR(ENOMEM);
         }
     }
     return 0;
 }
 
-// peek 出一个可以写的 Frame，此函数可能会阻塞。
-Frame *FrameQueuePeekWritable(FrameQueue *f) {
-    SDL_LockMutex(f->mutex);
-    while (f->size >= f->max_size) {
-        SDL_CondWait(f->cond, f->mutex);
-    }
-    SDL_UnlockMutex(f->mutex);
+// Frame *FrameQueuePeekReadable(FrameQueue *f) {
+//     std::unique_lock lk{f->mtx_};
+//     f->cv_notempty_.wait(lk, [&] { return f->size_ - f->rindex_shown_ > 0; });
+//     return &f->queue_[(f->rindex_ + f->rindex_shown_) % f->max_size_];
+// }
 
-    return &f->queue[f->windex];
+// peek 出一个可以写的 Frame，此函数可能会阻塞。
+Frame *PeekWritableFrameQueue(FrameQueue *f) {
+    std::unique_lock lk{f->mtx_};
+    f->cv_notfull_.wait(lk, [&] { return f->size_ < f->max_size_; });
+    return &f->queue_[f->windex_];
 }
 
 // 偏移读索引 rindex
@@ -146,34 +121,33 @@ Frame *FrameQueuePeekWritable(FrameQueue *f) {
 // 然后单独递增 rindex_shown 并 return
 // 下一次 Peek 读的时候 rindex + rindex_shown = 0 + 1
 void NextFrameQueue(FrameQueue *f) {
-    if (f->keep_last && !f->rindex_shown) {
-        f->rindex_shown = 1;
+    std::unique_lock lk{f->mtx_};
+    if (f->keep_last_ && !f->rindex_shown_) {
+        f->rindex_shown_ = 1;
         return;
     }
-    av_frame_unref(f->queue[f->rindex].frame);
-    if (++f->rindex == f->max_size) {
-        f->rindex = 0;
+    av_frame_unref(f->queue_[f->rindex_].frame_);
+    if (++f->rindex_ == f->max_size_) {
+        f->rindex_ = 0;
     }
-    SDL_LockMutex(f->mutex);
-    --f->size;
-    SDL_CondSignal(f->cond);
-    SDL_UnlockMutex(f->mutex);
+    --f->size_;
+    f->cv_notfull_.notify_one();
 }
 
 // 偏移写索引 windex
 void PushFrameQueue(FrameQueue *f) {
-    if (++f->windex == f->max_size) {
-        f->windex = 0;
+    std::unique_lock lk{f->mtx_};
+    if (++f->windex_ == f->max_size_) {
+        f->windex_ = 0;
     }
-    SDL_LockMutex(f->mutex);
-    ++f->size;
-    SDL_CondSignal(f->cond);
-    SDL_UnlockMutex(f->mutex);
+    ++f->size_;
+    f->cv_notempty_.notify_one();
 }
 
 // 获取当前可读取的帧，而不改变队列状态。
 // 渲染线程在渲染当前帧时使用，不会修改队列状态。
 Frame *PeekFrameQueue(FrameQueue *f) {
     // HACK: 读取索引 + 读取索引偏移
-    return &f->queue[(f->rindex + f->rindex_shown) % f->max_size];
+    std::unique_lock lk{f->mtx_};
+    return &f->queue_[(f->rindex_ + f->rindex_shown_) % f->max_size_];
 }
