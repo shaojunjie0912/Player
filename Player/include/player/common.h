@@ -5,7 +5,7 @@
 
 // ==================  ==================
 
-void RefreshSchedule(VideoState* av_state, int delay);
+void RefreshSchedule(VideoState* video_state, int delay);
 
 void SetDefaultWindowSize(int width, int height, AVRational sar);
 

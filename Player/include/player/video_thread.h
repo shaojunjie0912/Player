@@ -10,4 +10,4 @@ extern "C" {
 
 int DecodeThread(void* arg);
 
-void SdlEventLoop(VideoState* av_state);
+void SdlEventLoop(VideoState* video_state);

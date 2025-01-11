@@ -1,5 +1,8 @@
 #include <player/core.h>
 
+// peek: 偷看(用于 FrameQueue)
+// get: 获取(用于 PacketQueue)
+
 int InitPacketQueue(PacketQueue *q) {
     memset(q, 0, sizeof(PacketQueue));
     q->pkt_list = av_fifo_alloc2(1, sizeof(MyAVPacketList), AV_FIFO_FLAG_AUTO_GROW);
@@ -8,12 +11,12 @@ int InitPacketQueue(PacketQueue *q) {
     }
     q->mutex = SDL_CreateMutex();
     if (!q->mutex) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
+        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
         return AVERROR(ENOMEM);
     }
     q->cond = SDL_CreateCond();
     if (!q->cond) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
+        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
         return AVERROR(ENOMEM);
     }
     return 0;
@@ -108,23 +111,27 @@ int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last
     int i;
     memset(f, 0, sizeof(FrameQueue));
     if (!(f->mutex = SDL_CreateMutex())) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
+        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateMutex(): %s\n", SDL_GetError());
         return AVERROR(ENOMEM);
     }
     if (!(f->cond = SDL_CreateCond())) {
-        av_log(NULL, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
+        av_log(nullptr, AV_LOG_FATAL, "SDL_CreateCond(): %s\n", SDL_GetError());
         return AVERROR(ENOMEM);
     }
     f->pktq = pktq;
     f->max_size = FFMIN(max_size, kFrameQueueSize);
     f->keep_last = !!keep_last;
-    for (i = 0; i < f->max_size; i++)
-        if (!(f->queue[i].frame = av_frame_alloc())) return AVERROR(ENOMEM);
+    for (i = 0; i < f->max_size; i++) {
+        // 为 FrameQueue 中的 max_size 个 Frame 分配内存
+        if (!(f->queue[i].frame = av_frame_alloc())) {
+            return AVERROR(ENOMEM);
+        }
+    }
     return 0;
 }
 
+// peek 出一个可以写的 Frame，此函数可能会阻塞。
 Frame *FrameQueuePeekWritable(FrameQueue *f) {
-    /* wait until we have space to put a new frame */
     SDL_LockMutex(f->mutex);
     while (f->size >= f->max_size) {
         SDL_CondWait(f->cond, f->mutex);
@@ -134,43 +141,39 @@ Frame *FrameQueuePeekWritable(FrameQueue *f) {
     return &f->queue[f->windex];
 }
 
-void PushFrameQueue(FrameQueue *f) {
-    if (++f->windex == f->max_size) f->windex = 0;
+// 偏移读索引 rindex
+// HACK: 第一次 Peek 读的时候 rindex + rindex_shown = 0 + 0
+// 然后单独递增 rindex_shown 并 return
+// 下一次 Peek 读的时候 rindex + rindex_shown = 0 + 1
+void NextFrameQueue(FrameQueue *f) {
+    if (f->keep_last && !f->rindex_shown) {
+        f->rindex_shown = 1;
+        return;
+    }
+    av_frame_unref(f->queue[f->rindex].frame);
+    if (++f->rindex == f->max_size) {
+        f->rindex = 0;
+    }
     SDL_LockMutex(f->mutex);
-    f->size++;
+    --f->size;
     SDL_CondSignal(f->cond);
     SDL_UnlockMutex(f->mutex);
 }
 
-Frame *PeekFrameQueue(FrameQueue *f) { return &f->queue[(f->rindex + f->rindex_shown) % f->max_size]; }
-
-void PopFrameQueue(FrameQueue *f) {
+// 偏移写索引 windex
+void PushFrameQueue(FrameQueue *f) {
+    if (++f->windex == f->max_size) {
+        f->windex = 0;
+    }
     SDL_LockMutex(f->mutex);
-
-    // 等待队列中有可移除的帧
-    while (f->size == 0) {
-        SDL_CondWait(f->cond, f->mutex);
-    }
-
-    // 获取要移除的帧
-    Frame *frame = &f->queue[f->rindex];
-
-    // 释放当前帧的内存
-    av_frame_free(&frame->frame);
-
-    // 更新读索引和队列大小
-    if (++f->rindex == f->max_size) {
-        f->rindex = 0;
-    }
-    f->size--;
-
-    // 如果 keep_last 为 1，更新 rindex_shown 保证上一帧在队列中不被销毁
-    if (f->keep_last) {
-        f->rindex_shown = (f->rindex_shown + 1) % f->max_size;
-    }
-
-    // 发送信号，通知其他线程队列有空闲空间
+    ++f->size;
     SDL_CondSignal(f->cond);
-
     SDL_UnlockMutex(f->mutex);
+}
+
+// 获取当前可读取的帧，而不改变队列状态。
+// 渲染线程在渲染当前帧时使用，不会修改队列状态。
+Frame *PeekFrameQueue(FrameQueue *f) {
+    // HACK: 读取索引 + 读取索引偏移
+    return &f->queue[(f->rindex + f->rindex_shown) % f->max_size];
 }

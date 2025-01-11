@@ -8,7 +8,7 @@ uint32_t MyRefreshTimerCallback(uint32_t interval, void* opaque) {
     return 0;
 }
 
-void RefreshSchedule(VideoState* av_state, int delay) { SDL_AddTimer(delay, MyRefreshTimerCallback, av_state); }
+void RefreshSchedule(VideoState* video_state, int delay) { SDL_AddTimer(delay, MyRefreshTimerCallback, video_state); }
 
 void CalculateDisplayRect(SDL_Rect* rect, int screen_x_left, int screen_y_top, int screen_width, int screen_height,
                           int picture_width, int picture_height, AVRational picture_sar) {

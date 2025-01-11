@@ -11,17 +11,6 @@ extern "C" {
 
 constexpr int kFrameQueueSize = 16;
 
-struct Frame {
-    AVFrame *frame;
-    double pts;      /* presentation timestamp for the frame */
-    double duration; /* estimated duration of the frame */
-    int64_t pos;     /* byte position of the frame in the input file */
-    int width;
-    int height;
-    int format;
-    AVRational sar;
-};
-
 struct MyAVPacketList {
     AVPacket *pkt;
 };
@@ -35,6 +24,17 @@ struct PacketQueue {
     SDL_cond *cond;
 };
 
+struct Frame {
+    AVFrame *frame;
+    double pts;      /* presentation timestamp for the frame */
+    double duration; /* estimated duration of the frame */
+    int64_t pos;     /* byte position of the frame in the input file */
+    int width;
+    int height;
+    int format;
+    AVRational sar;
+};
+
 struct FrameQueue {
     Frame queue[kFrameQueueSize]; /* 用于存放帧数据的队列 */
     int rindex;                   /* 读索引 */
@@ -45,7 +45,7 @@ struct FrameQueue {
     int rindex_shown;             /* keep_last的实现，读的时候实际上读的是rindex + rindex_shown，分析见下 */
     SDL_mutex *mutex;
     SDL_cond *cond;
-    PacketQueue *pktq; /* 指向对应的PacketQueue，FrameQueue里面的数据就是这个队列解码出来的 */
+    PacketQueue *pktq;  // 关联的 PacketQueue
 };
 
 struct VideoState {
@@ -84,10 +84,10 @@ struct VideoState {
     FrameQueue video_frame_queue_;  // 解码后的视频帧队列
 
     // ================== SDL ==================
-    int y_top_;   // 顶部边界(窗口上面要留多少空间)
-    int x_left_;  // 左边界(窗口左边要留多少空间)
-    int width_;   // 窗口宽度
-    int height_;  // 窗口高度
+    int x_left_;  // 播放器窗口左上角 x 坐标
+    int y_top_;   // 播放器窗口左上角 y 坐标
+    int width_;   // 播放器窗口宽度
+    int height_;  // 播放器窗口高度
 
     SDL_Texture *texture_;
 
@@ -105,9 +105,12 @@ struct VideoState {
     SDL_Thread *read_tid_;
     SDL_Thread *decode_tid_;
 
-    bool quit_;
+    SDL_cond *continue_read_thread_;
+
+    bool quit_{false};
 };
 
+// ================== PacketQueue Functions ==================
 int InitPacketQueue(PacketQueue *q);
 int PutPacketQueueInternal(PacketQueue *q, AVPacket *pkt);
 int PutPacketQueue(PacketQueue *q, AVPacket *pkt);
@@ -115,8 +118,10 @@ int GetPacketQueue(PacketQueue *q, AVPacket *pkt, int block);
 void FlushPacketQueue(PacketQueue *q);
 void DestoryPacketQueue(PacketQueue *q);
 
+// ================== FrameQueue Functions ==================
 int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last);
 Frame *FrameQueuePeekWritable(FrameQueue *f);
+
 void PushFrameQueue(FrameQueue *f);
 Frame *PeekFrameQueue(FrameQueue *f);
 void PopFrameQueue(FrameQueue *f);

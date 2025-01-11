@@ -3,40 +3,40 @@
 extern SDL_Window* window;
 extern SDL_Renderer* renderer;
 
-int OpenVideo(VideoState* av_state) {
+int OpenVideo(VideoState* video_state) {
     int w, h;
     // w = screen_width ? screen_width : default_width;
     // h = screen_height ? screen_height : default_height;
     w = kScreenWidth;
     h = kScreenHeight;
 
-    SDL_SetWindowTitle(window, av_state->file_name_.c_str());
+    SDL_SetWindowTitle(window, video_state->file_name_.c_str());
 
     SDL_SetWindowSize(window, w, h);
     SDL_SetWindowPosition(window, kScreenLeft, kScreenTop);
     SDL_ShowWindow(window);
 
-    av_state->width_ = w;
-    av_state->height_ = h;
+    video_state->width_ = w;
+    video_state->height_ = h;
 
     return 0;
 }
 
-void DisplayVideo(VideoState* av_state) {
-    if (!av_state->width_) {
-        OpenVideo(av_state);
+void DisplayVideo(VideoState* video_state) {
+    if (!video_state->width_) {
+        OpenVideo(video_state);
     }
-    Frame* vp = PeekFrameQueue(&av_state->video_frame_queue_);
+    Frame* vp = PeekFrameQueue(&video_state->video_frame_queue_);
 
     AVFrame* frame = vp->frame;
 
-    if (!av_state->texture_) {
+    if (!video_state->texture_) {
         int width = frame->width;
         int height = frame->height;
 
         uint32_t pix_format = SDL_PIXELFORMAT_IYUV;
-        av_state->texture_ = SDL_CreateTexture(renderer, pix_format, SDL_TEXTUREACCESS_STREAMING, width, height);
-        if (!av_state->texture_) {
+        video_state->texture_ = SDL_CreateTexture(renderer, pix_format, SDL_TEXTUREACCESS_STREAMING, width, height);
+        if (!video_state->texture_) {
             av_log(nullptr, AV_LOG_ERROR, "SDL_CreateTexture failed\n");
             return;
         }
@@ -44,51 +44,51 @@ void DisplayVideo(VideoState* av_state) {
 
     // 计算显示的位置
     SDL_Rect rect;
-    CalculateDisplayRect(&rect, av_state->x_left_, av_state->y_top_, av_state->width_, av_state->height_, vp->width,
-                         vp->height, vp->sar);
+    CalculateDisplayRect(&rect, video_state->x_left_, video_state->y_top_, video_state->width_, video_state->height_,
+                         vp->width, vp->height, vp->sar);
 
     // 渲染
-    SDL_UpdateYUVTexture(av_state->texture_, nullptr, frame->data[0], frame->linesize[0], frame->data[1],
+    SDL_UpdateYUVTexture(video_state->texture_, nullptr, frame->data[0], frame->linesize[0], frame->data[1],
                          frame->linesize[1], frame->data[2], frame->linesize[2]);
     SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, av_state->texture_, nullptr, &rect);
+    SDL_RenderCopy(renderer, video_state->texture_, nullptr, &rect);
     SDL_RenderPresent(renderer);
 
     // 释放视频帧
-    PopFrameQueue(&av_state->video_frame_queue_);  // 将已经渲染好的一帧从队列中移除
+    PopFrameQueue(&video_state->video_frame_queue_);  // 将已经渲染好的一帧从队列中移除
 }
 
 void VideoRefreshTimer(void* user_data) {
-    VideoState* av_state = static_cast<VideoState*>(user_data);
+    VideoState* video_state = static_cast<VideoState*>(user_data);
     Frame* vp{nullptr};
 
     double actual_delay, delay, sync_threshold, ref_clock, diff;
 
-    if (av_state->video_stream_) {                     // 如果存在视频流
-        if (av_state->video_frame_queue_.size == 0) {  // 如果视频帧队列为空
-            RefreshSchedule(av_state, 1);              // 快速刷新直到发现有数据
+    if (video_state->video_stream_) {                     // 如果存在视频流
+        if (video_state->video_frame_queue_.size == 0) {  // 如果视频帧队列为空
+            RefreshSchedule(video_state, 1);              // 快速刷新直到发现有数据
         } else {
-            vp = PeekFrameQueue(&av_state->video_frame_queue_);
-            av_state->video_current_pts_ = vp->pts;
-            av_state->video_current_pts_time_ = av_gettime();
-            if (av_state->frame_last_pts_ == 0) {
+            vp = PeekFrameQueue(&video_state->video_frame_queue_);
+            video_state->video_current_pts_ = vp->pts;
+            video_state->video_current_pts_time_ = av_gettime();
+            if (video_state->frame_last_pts_ == 0) {
                 delay = 0;
             } else {
                 // the pts from last time
-                delay = vp->pts - av_state->frame_last_pts_;
+                delay = vp->pts - video_state->frame_last_pts_;
             }
 
             if (delay <= 0 || delay >= 1.0) {
                 // 如果是不正确的 delay, 使用上一次的 delay
-                delay = av_state->frame_last_delay_;
+                delay = video_state->frame_last_delay_;
             }
             // save for next time
-            av_state->frame_last_delay_ = delay;
-            av_state->frame_last_pts_ = vp->pts;
+            video_state->frame_last_delay_ = delay;
+            video_state->frame_last_pts_ = vp->pts;
 
             // 更新 delay 同步到音频
-            // ref_clock = GetMasterClock(av_state);  // 获取主时钟(这里就是音频时钟)
-            ref_clock = av_state->audio_clock_;  // NOTE: 我直接写死了
+            // ref_clock = GetMasterClock(video_state);  // 获取主时钟(这里就是音频时钟)
+            ref_clock = video_state->audio_clock_;  // NOTE: 我直接写死了
             diff = vp->pts - ref_clock;
 
             // Skip or repeat the frame. Take delay into account
@@ -101,29 +101,29 @@ void VideoRefreshTimer(void* user_data) {
                     delay = 2 * delay;                // 延迟
                 }
             }
-            av_state->frame_timer_ += delay;  // 更新视频时钟
+            video_state->frame_timer_ += delay;  // 更新视频时钟
             // 计算实际延迟
-            actual_delay = av_state->frame_timer_ - (av_gettime() / 1000000.0);
+            actual_delay = video_state->frame_timer_ - (av_gettime() / 1000000.0);
             if (actual_delay < 0.010) {
                 actual_delay = 0.010;
             }
 
-            RefreshSchedule(av_state, (int)(actual_delay * 1000 + 0.5));
+            RefreshSchedule(video_state, (int)(actual_delay * 1000 + 0.5));
 
-            DisplayVideo(av_state);
+            DisplayVideo(video_state);
         }
     } else {
-        RefreshSchedule(av_state, 100);
+        RefreshSchedule(video_state, 100);
     }
 }
 
-void SdlEventLoop(VideoState* av_state) {
+void SdlEventLoop(VideoState* video_state) {
     SDL_Event event;
     while (true) {
         SDL_WaitEvent(&event);
         switch (event.type) {
             case SDL_QUIT:
-                av_state->quit_ = true;
+                video_state->quit_ = true;
                 SDL_Quit();
                 return;
             case kFFRefreshEvent:
@@ -136,9 +136,10 @@ void SdlEventLoop(VideoState* av_state) {
     }
 }
 
-int QueuePicture(VideoState* av_state, AVFrame* src_frame, double pts, double duration, int64_t pos) {
+int QueuePicture(VideoState* video_state, AVFrame* src_frame, double pts, double duration, int64_t pos) {
     Frame* vp;
-    if (!(vp = FrameQueuePeekWritable(&av_state->video_frame_queue_))) {
+    if (!(vp = FrameQueuePeekWritable(&video_state->video_frame_queue_))) {
+        av_log(nullptr, AV_LOG_ERROR, "FrameQueuePeekWritable failed\n");
         return -1;
     }
     vp->sar = src_frame->sample_aspect_ratio;
@@ -153,26 +154,26 @@ int QueuePicture(VideoState* av_state, AVFrame* src_frame, double pts, double du
     SetDefaultWindowSize(vp->width, vp->height, vp->sar);
 
     av_frame_move_ref(vp->frame, src_frame);
-    PushFrameQueue(&av_state->video_frame_queue_);
+    PushFrameQueue(&video_state->video_frame_queue_);
     return 0;
 }
 
-double SyschronizeVideo(VideoState* av_state, AVFrame* frame, double pts) {
+double SyschronizeVideo(VideoState* video_state, AVFrame* frame, double pts) {
     double frame_delay;
 
     if (pts != 0) {
         // 如果有 pts 则设置 video_clock = pts
-        av_state->video_clock_ = pts;  // pts from codec
+        video_state->video_clock_ = pts;  // pts from codec
     } else {
         // 如果没有 pts 则设置 pts = video_clock
-        pts = av_state->video_clock_;  // use previous frame pts
+        pts = video_state->video_clock_;  // use previous frame pts
     }
 
     //  更新视频时钟
-    frame_delay = av_q2d(av_state->video_stream_->time_base);  // 时间基 -> 秒
+    frame_delay = av_q2d(video_state->video_stream_->time_base);  // 时间基 -> 秒
     // 如果我们在重复一帧，相应调整时钟
     frame_delay += frame->repeat_pict * (frame_delay * 0.5);
-    av_state->video_clock_ += frame_delay;
+    video_state->video_clock_ += frame_delay;
 
     return pts;
 }
@@ -183,20 +184,20 @@ int DecodeThread(void* arg) {
     double pts;
     double duration;
 
-    VideoState* av_state = static_cast<VideoState*>(arg);
+    VideoState* video_state = static_cast<VideoState*>(arg);
     AVFrame* video_frame = av_frame_alloc();  // 解码后的视频帧
     Frame* frame = nullptr;
 
-    AVRational time_base = av_state->video_stream_->time_base;
-    AVRational frame_rate = av_state->video_stream_->avg_frame_rate;
+    AVRational time_base = video_state->video_stream_->time_base;
+    AVRational frame_rate = video_state->video_stream_->avg_frame_rate;
 
     while (true) {
-        if (av_state->quit_) {
+        if (video_state->quit_) {
             break;
         }
 
         // 非阻塞读取
-        ret = GetPacketQueue(&av_state->video_packet_queue_, &av_state->video_packet_, 0);
+        ret = GetPacketQueue(&video_state->video_packet_queue_, &video_state->video_packet_, 0);
         if (ret <= 0) {
             // 意味着我们停止获取包
             av_log(nullptr, AV_LOG_DEBUG, "Video delay 10 ms\n");
@@ -204,14 +205,14 @@ int DecodeThread(void* arg) {
             continue;
         }
 
-        ret = avcodec_send_packet(av_state->video_codec_context_, &av_state->video_packet_);
-        av_packet_unref(&av_state->video_packet_);  // 清空引用计数(因为解码器内部会拷贝一份)
+        ret = avcodec_send_packet(video_state->video_codec_context_, &video_state->video_packet_);
+        av_packet_unref(&video_state->video_packet_);  // 清空引用计数(因为解码器内部会拷贝一份)
         if (ret < 0) {
             av_log(nullptr, AV_LOG_ERROR, "avcodec_send_packet failed\n");
             return -1;
         }
         while (ret >= 0) {
-            ret = avcodec_receive_frame(av_state->video_codec_context_, video_frame);
+            ret = avcodec_receive_frame(video_state->video_codec_context_, video_frame);
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
                 break;
             } else if (ret < 0) {
@@ -220,17 +221,17 @@ int DecodeThread(void* arg) {
             }
 
             // NOTE: 如果不做音视频同步的话，这里直接显示就行了
-            // DisplayVideo(av_state);
+            // DisplayVideo(video_state);
 
             // ================== 音视频同步 ==================
             // 计算当前帧的时长
             AVRational rational{frame_rate.den, frame_rate.num};
             duration = (frame_rate.num && frame_rate.den ? av_q2d(rational) : 0);
             pts = (video_frame->pts == AV_NOPTS_VALUE) ? NAN : video_frame->pts * av_q2d(time_base);
-            pts = SyschronizeVideo(av_state, video_frame, pts);
+            pts = SyschronizeVideo(video_state, video_frame, pts);
 
             // 插入到视频帧队列
-            QueuePicture(av_state, video_frame, pts, duration, video_frame->pkt_pos);
+            QueuePicture(video_state, video_frame, pts, duration, video_frame->pkt_pos);
 
             // 解引用
             av_frame_unref(video_frame);

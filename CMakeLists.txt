@@ -10,6 +10,7 @@ find_package(FFMPEG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
 
 if(MSVC)
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
   add_compile_definitions(NOMINMAX)
   add_compile_definitions(_WINSOCKAPI_)
 endif()
