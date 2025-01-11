@@ -122,3 +122,55 @@ int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last
         if (!(f->queue[i].frame = av_frame_alloc())) return AVERROR(ENOMEM);
     return 0;
 }
+
+Frame *FrameQueuePeekWritable(FrameQueue *f) {
+    /* wait until we have space to put a new frame */
+    SDL_LockMutex(f->mutex);
+    while (f->size >= f->max_size) {
+        SDL_CondWait(f->cond, f->mutex);
+    }
+    SDL_UnlockMutex(f->mutex);
+
+    return &f->queue[f->windex];
+}
+
+void PushFrameQueue(FrameQueue *f) {
+    if (++f->windex == f->max_size) f->windex = 0;
+    SDL_LockMutex(f->mutex);
+    f->size++;
+    SDL_CondSignal(f->cond);
+    SDL_UnlockMutex(f->mutex);
+}
+
+Frame *PeekFrameQueue(FrameQueue *f) { return &f->queue[(f->rindex + f->rindex_shown) % f->max_size]; }
+
+void PopFrameQueue(FrameQueue *f) {
+    SDL_LockMutex(f->mutex);
+
+    // 等待队列中有可移除的帧
+    while (f->size == 0) {
+        SDL_CondWait(f->cond, f->mutex);
+    }
+
+    // 获取要移除的帧
+    Frame *frame = &f->queue[f->rindex];
+
+    // 释放当前帧的内存
+    av_frame_free(&frame->frame);
+
+    // 更新读索引和队列大小
+    if (++f->rindex == f->max_size) {
+        f->rindex = 0;
+    }
+    f->size--;
+
+    // 如果 keep_last 为 1，更新 rindex_shown 保证上一帧在队列中不被销毁
+    if (f->keep_last) {
+        f->rindex_shown = (f->rindex_shown + 1) % f->max_size;
+    }
+
+    // 发送信号，通知其他线程队列有空闲空间
+    SDL_CondSignal(f->cond);
+
+    SDL_UnlockMutex(f->mutex);
+}

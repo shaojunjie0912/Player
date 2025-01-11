@@ -10,8 +10,8 @@ extern "C" {
 
 #include <player/core.h>
 
-constexpr int kMaxAudioFrameSize = 192000;
-constexpr int kVideoPictureQueueSize = 1;
+// constexpr int kMaxAudioFrameSize = 192000;
+constexpr int kVideoPictureQueueSize = 3;
 
 enum class AVSyncType {
     AV_SYNC_AUDIO_MASTER,     // 音频为主, 视频同步到音频
@@ -44,6 +44,7 @@ struct AVState {
     AVStream* video_stream_;
     AVCodecContext* video_codec_context_;
     PacketQueue video_packet_queue_;
+    AVPacket video_packet_;
     struct SwsContext* video_sws_context_;
 
     FrameQueue video_frame_queue_;  // 解码后的视频帧队列
@@ -63,13 +64,21 @@ struct AVState {
 
     AVSyncType av_sync_type_;
 
-    int quit_;
+    bool quit_;
 
     // ================== 音视频同步 ==================
-    double frame_timer_;        // 最后一帧播放的时刻(现在视频播放了多长时间)
-    double frame_last_delay_;   // 最后一帧滤波延迟(上一次渲染视频帧delay时间)
-    double video_current_pts_;  // 当前 pts 系统时间
+    double frame_timer_;              // 最后一帧播放的时刻(现在视频播放了多长时间)
+    double frame_last_delay_;         // 最后一帧滤波延迟(上一次渲染视频帧delay时间)
+    double video_current_pts_;        // 当前 pts
+    int64_t video_current_pts_time_;  // 系统时间
+    double frame_last_pts_;           // 上一帧的 pts
 
     double audio_clock_;
-    // double video_clock_;
+    double video_clock_;
+
+    int width_;
+    int height_;
+
+    // SDL_Renderer* renderer_;
+    SDL_Texture* texture_;
 };

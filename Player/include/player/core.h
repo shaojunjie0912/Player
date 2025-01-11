@@ -10,8 +10,6 @@ constexpr int kFrameQueueSize = 16;
 
 struct Frame {
     AVFrame *frame;
-    AVSubtitle sub;
-    int serial;
     double pts;      /* presentation timestamp for the frame */
     double duration; /* estimated duration of the frame */
     int64_t pos;     /* byte position of the frame in the input file */
@@ -19,8 +17,6 @@ struct Frame {
     int height;
     int format;
     AVRational sar;
-    int uploaded;
-    int flip_v;
 };
 
 struct MyAVPacketList {
@@ -51,9 +47,9 @@ struct FrameQueue {
     int max_size;                 /* 队列最大缓存的帧数 */
     int keep_last;                /* 播放后是否在队列中保留上一帧不销毁 */
     int rindex_shown;             /* keep_last的实现，读的时候实际上读的是rindex + rindex_shown，分析见下 */
-    SDL_mutex *mutex;             /* 互斥锁，用于保护队列操作 */
-    SDL_cond *cond;               /* 条件变量，用于解码和播放线程的相互通知 */
-    PacketQueue *pktq;            /* 指向对应的PacketQueue，FrameQueue里面的数据就是这个队列解码出来的 */
+    SDL_mutex *mutex;
+    SDL_cond *cond;
+    PacketQueue *pktq; /* 指向对应的PacketQueue，FrameQueue里面的数据就是这个队列解码出来的 */
 };
 
 int InitPacketQueue(PacketQueue *q);
@@ -64,3 +60,7 @@ void FlushPacketQueue(PacketQueue *q);
 void DestoryPacketQueue(PacketQueue *q);
 
 int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last);
+Frame *FrameQueuePeekWritable(FrameQueue *f);
+void PushFrameQueue(FrameQueue *f);
+Frame *PeekFrameQueue(FrameQueue *f);
+void PopFrameQueue(FrameQueue *f);

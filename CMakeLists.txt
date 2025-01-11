@@ -9,5 +9,11 @@ project(CutePlayer LANGUAGES CXX)
 find_package(FFMPEG REQUIRED)
 find_package(SDL2 CONFIG REQUIRED)
 
+# 如果是windows msvc编译器，需要添加这个
+if(MSVC)
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+  # add_compile_definitions(NOMINMAX)
+endif()
+
 add_subdirectory(Player)
 # add_subdirectory(tests)
