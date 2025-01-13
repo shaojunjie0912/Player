@@ -137,7 +137,6 @@ int ReadThread(void* arg) {
 
 int OpenStreamComponent(VideoState* video_state, int stream_index) {
     int ret = -1;
-    AVChannelLayout ch_layout;
 
     AVFormatContext* format_context{video_state->format_context_};
     if (stream_index < 0 || stream_index >= format_context->nb_streams) {
@@ -177,6 +176,7 @@ int OpenStreamComponent(VideoState* video_state, int stream_index) {
 
     // 线程 1: 音频(由 SDL 内部创建)
     if (codec_context->codec_type == AVMEDIA_TYPE_AUDIO) {
+        AVChannelLayout ch_layout;
         int sample_rate{codec_context->sample_rate};
         ret = av_channel_layout_copy(&ch_layout, &codec_context->ch_layout);
         if (ret < 0) {
@@ -189,11 +189,9 @@ int OpenStreamComponent(VideoState* video_state, int stream_index) {
             av_log(nullptr, AV_LOG_ERROR, "OpenAudio failed\n");
             return -1;
         }
-        video_state->audio_buffer_size_ = 0;
-        video_state->audio_buffer_index_ = 0;
         video_state->audio_stream_ = stream;
         video_state->audio_stream_idx_ = stream_index;
-        video_state->audio_codec_context_ = codec_context;  // TODO: 视频里面忘记了
+        video_state->audio_codec_context_ = codec_context;
 
         // 开始播放声音
         SDL_PauseAudio(0);

@@ -4,20 +4,12 @@ int AudioDecodeFrame(VideoState* video_state) {
     int ret{-1};
     while (true) {
         // 从队列中读取数据
-        // TODO: 这里 audio_packet 不是为空么?
-        // 所以我手动分配
-        // if (!video_state->audio_packet_) {
-        //     video_state->audio_packet_ = av_packet_alloc();
-        // }
-        ret =
-            GetPacketQueue(&video_state->audio_packet_queue_, &video_state->audio_packet_, 0);  // TODO: 这里参数视频是&
+        ret = GetPacketQueue(&video_state->audio_packet_queue_, &video_state->audio_packet_, 0);
         if (ret <= 0) {
             av_log(nullptr, AV_LOG_ERROR, "GetPacketQueue failed\n");
             break;
         }
-        // TODO: 音频编码器上下文不是还没传么?(我手动传了)
-        ret = avcodec_send_packet(video_state->audio_codec_context_,
-                                  &video_state->audio_packet_);  // TODO: 这里参数视频是&
+        ret = avcodec_send_packet(video_state->audio_codec_context_, &video_state->audio_packet_);
         av_packet_unref(&video_state->audio_packet_);
         if (ret < 0) {
             av_log(nullptr, AV_LOG_ERROR, "avcodec_send_packet failed\n");
@@ -79,50 +71,62 @@ int AudioDecodeFrame(VideoState* video_state) {
     return 0;
 }
 
-// 回调函数(在SDL单独线程中运行)
+/**
+ * @brief 音频回调函数(由 SDL 创建线程)
+ * @param userdata 用户数据
+ * @param stream 音频数据流(NOTE: 音频设备从该流中获取数据 🧀)
+ * @param len 需要填充的数据长度
+ */
 void MyAudioCallback(void* userdata, uint8_t* stream, int len) {
     VideoState* video_state{(VideoState*)userdata};
-    int len1 = 0;
-    int audio_size = 0;
+    int remain_len = 0;
     while (len > 0) {
+        // 缓冲区没有数据了
         if (video_state->audio_buffer_index_ >= video_state->audio_buffer_size_) {
             // 已经发送我们所有的数据，获取更多
-            audio_size = AudioDecodeFrame(video_state);
-            if (audio_size < 0) {
-                // 如果出错了，输出静音
-                video_state->audio_buffer_size_ = kSDLAudioBufferSize;
+            int decoded_audio_size = AudioDecodeFrame(video_state);
+            if (decoded_audio_size < 0) {  // 如果出错了，输出静音
                 video_state->audio_buffer_ = nullptr;
+                video_state->audio_buffer_size_ = kSdlAudioBufferSize;
             } else {
-                video_state->audio_buffer_size_ = audio_size;
+                video_state->audio_buffer_size_ = decoded_audio_size;
             }
-            video_state->audio_buffer_index_ = 0;
+            video_state->audio_buffer_index_ = 0;  // 重置索引, 下次从头读
         }
-        len1 = video_state->audio_buffer_size_ - video_state->audio_buffer_index_;
-        if (len1 > len) {
-            len1 = len;
+        remain_len = video_state->audio_buffer_size_ - video_state->audio_buffer_index_;
+        if (remain_len > len) {  // 如果剩余数据大于需要填充的数据长度 len
+            remain_len = len;    // 只填充 len 长度的数据
         }
         if (video_state->audio_buffer_) {
+            // 如果音频缓冲区有数据，拷贝到 stream 中
+            memcpy(stream, video_state->audio_buffer_ + video_state->audio_buffer_index_, remain_len);
+        } else {
+            memset(stream, 0, remain_len);  // 静音
         }
+        len -= remain_len;
+        stream += remain_len;
+        video_state->audio_buffer_index_ += remain_len;
     }
 }
 
 int OpenAudio(void* opaque, AVChannelLayout* wanted_channel_layout, int wanted_sample_rate) {
-    SDL_AudioSpec wanted_spec, spec;
     int wanted_nb_channels{wanted_channel_layout->nb_channels};
 
     // 设置音频参数
-    // TODO: C++20 结构体初始化
-    wanted_spec.freq = wanted_sample_rate;
-    wanted_spec.format = AUDIO_S16SYS;
-    wanted_spec.channels = wanted_nb_channels;
-    wanted_spec.silence = 0;
-    wanted_spec.samples = kSDLAudioBufferSize;  // kSDLAudioBufferSize
-    wanted_spec.callback = MyAudioCallback;
-    wanted_spec.userdata = (void*)opaque;
+    SDL_AudioSpec wanted_spec{
+        .freq = wanted_sample_rate,
+        .format = AUDIO_S16SYS,
+        .channels = (uint8_t)wanted_nb_channels,
+        .silence = 0,
+        .samples = kSdlAudioBufferSize,
+        .callback = MyAudioCallback,
+        .userdata = opaque,
+    };
 
     av_log(nullptr, AV_LOG_INFO, "wanted spec: channels: %d, sample_fmt: %d, sample_rate:%d\n", wanted_nb_channels,
            AUDIO_S16SYS, wanted_sample_rate);
 
+    SDL_AudioSpec spec;
     int ret = SDL_OpenAudio(&wanted_spec, &spec);
     if (ret < 0) {
         av_log(nullptr, AV_LOG_ERROR, "SDL_OpenAudio failed\n");

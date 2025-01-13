@@ -76,13 +76,9 @@ struct VideoState {
     uint8_t *audio_buffer_;
     uint32_t audio_buffer_size_;
     uint32_t audio_buffer_index_;
-    uint8_t *audio_paket_data_;
-    int audio_packet_size_;
     struct SwrContext *audio_swr_context_;
 
     // ================== Video ==================
-    struct SwsContext *video_sws_context_;
-
     FrameQueue video_frame_queue_;  // 解码后的视频帧队列
 
     // ================== SDL ==================
@@ -93,7 +89,8 @@ struct VideoState {
 
     SDL_Texture *texture_;
 
-    // ================== Sync(固定主音频) ==================
+    // ================== Sync ==================
+    // NOTE: 写死了主时钟为音频时钟
     double frame_timer_;              // 最后一帧播放的时刻(现在视频播放了多长时间)
     double frame_last_delay_;         // 最后一帧滤波延迟(上一次渲染视频帧delay时间)
     double video_current_pts_;        // 当前 pts

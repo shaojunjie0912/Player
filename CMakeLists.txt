@@ -16,3 +16,4 @@ if(MSVC)
 endif()
 
 add_subdirectory(Player)
+add_subdirectory(tests)
