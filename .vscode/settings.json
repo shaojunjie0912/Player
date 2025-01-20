@@ -9,12 +9,12 @@
     "xmake.compileCommandsDirectory": "${workspaceRoot}/build",
     "xmake.debuggingTargetsArguments": {
         "default": [
-            "D:\\CodeField\\Player\\data\\k-on.mp4"
+            "${workspaceRoot}/data/k-on.mp4"
         ]
     },
     "xmake.runningTargetsArguments": {
         "default": [
-            "D:\\CodeField\\Player\\data\\k-on.mp4"
+            "${workspaceRoot}/data/k-on.mp4"
         ]
     }
 }
