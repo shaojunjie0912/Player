@@ -6,16 +6,15 @@ set_defaultmode("debug")
 
 set_license("GPL-3.0")
 
-set_encodings("source:utf-8")
-
 add_rules("mode.debug", "mode.release")
 
-add_requires("libsdl", { configs = { sdlmain = false } })
-add_requires("ffmpeg")
+add_requires("libsdl", { configs = { sdlmain = false, shared = true } })
+add_requires("ffmpeg", { configs = { shared = true } })
+add_requires("fmt", { configs = { shared = true } })
 
 
 target("player")
     set_kind("binary")
     add_files("src/*.cpp")
     add_includedirs("include")
-    add_packages("libsdl", "ffmpeg")
+    add_packages("libsdl", "ffmpeg", "fmt")

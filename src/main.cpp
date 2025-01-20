@@ -1,6 +1,8 @@
+#include <fmt/core.h>
 #include <player/read_thread.h>
 
 #include <string>
+
 
 SDL_Window* window = nullptr;
 SDL_Renderer* renderer = nullptr;

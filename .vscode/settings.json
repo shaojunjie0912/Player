@@ -6,5 +6,15 @@
     ],
     "xmake.debugConfigType": "codelldb",
     // "xmake.runMode": "buildRun",
-    "xmake.compileCommandsDirectory": "${workspaceRoot}/build"
+    "xmake.compileCommandsDirectory": "${workspaceRoot}/build",
+    "xmake.debuggingTargetsArguments": {
+        "default": [
+            "D:\\CodeField\\Player\\data\\k-on.mp4"
+        ]
+    },
+    "xmake.runningTargetsArguments": {
+        "default": [
+            "D:\\CodeField\\Player\\data\\k-on.mp4"
+        ]
+    }
 }
