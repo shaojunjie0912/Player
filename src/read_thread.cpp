@@ -1,4 +1,4 @@
-#include <player/read_thread.h>
+#include <player/read_thread.hpp>
 
 int OpenStreamComponent(VideoState* video_state, int stream_index);
 

@@ -13,14 +13,14 @@ extern "C" {
 #include <libswresample/swresample.h>
 }
 
-#include <player/common.h>
-#include <player/const.h>
-#include <player/core.h>
+#include <player/common.hpp>
+#include <player/const.hpp>
+#include <player/core.hpp>
 
 // 视频线程
-#include <player/video_thread.h>
+#include <player/video_thread.hpp>
 // 音频线程
-#include <player/audio_thread.h>
+#include <player/audio_thread.hpp>
 
 VideoState* OpenStream(std::string const& file_name);
 

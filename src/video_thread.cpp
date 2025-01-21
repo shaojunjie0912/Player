@@ -1,29 +1,23 @@
-#include <player/video_thread.h>
+#include <player/video_thread.hpp>
 
 extern SDL_Window* window;
 extern SDL_Renderer* renderer;
 
 int OpenVideo(VideoState* video_state) {
-    int w, h;
-    // w = screen_width ? screen_width : default_width;
-    // h = screen_height ? screen_height : default_height;
-    w = kScreenWidth;
-    h = kScreenHeight;
-
     SDL_SetWindowTitle(window, video_state->file_name_.c_str());
 
-    SDL_SetWindowSize(window, w, h);
-    SDL_SetWindowPosition(window, kScreenLeft, kScreenTop);
+    SDL_SetWindowSize(window, kScreenWidth, kScreenHeight);
+    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(window);
 
-    video_state->width_ = w;
-    video_state->height_ = h;
+    video_state->width_ = kScreenWidth;
+    video_state->height_ = kScreenHeight;
 
     return 0;
 }
 
 void DisplayVideo(VideoState* video_state) {
-    if (!video_state->width_) {
+    if (video_state->width_ == 0) {
         OpenVideo(video_state);
     }
     Frame* vp = PeekFrameQueue(&video_state->video_frame_queue_);

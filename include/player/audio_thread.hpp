@@ -1,11 +1,9 @@
 #pragma once
 
-#include <player/common.h>
-#include <player/const.h>
-#include <player/core.h>
-
 #include <cmath>
-
+#include <player/common.hpp>
+#include <player/const.hpp>
+#include <player/core.hpp>
 
 extern "C" {
 #include <libswresample/swresample.h>

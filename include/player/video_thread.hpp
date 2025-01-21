@@ -4,9 +4,9 @@ extern "C" {
 #include <libavutil/time.h>
 }
 
-#include <player/common.h>
-#include <player/const.h>
-#include <player/core.h>
+#include <player/common.hpp>
+#include <player/const.hpp>
+#include <player/core.hpp>
 
 int DecodeThread(void* arg);
 
