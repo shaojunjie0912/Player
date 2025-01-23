@@ -88,13 +88,13 @@ void DestoryPacketQueue(PacketQueue *q) {
     av_fifo_freep2(&q->pkt_list_);
 }
 
-int InitFrameQueue(FrameQueue *f, PacketQueue *pktq, int max_size, int keep_last) {
+int InitFrameQueue(FrameQueue *frame_queue, PacketQueue *packet_queue, int max_size, int keep_last) {
     int i;
-    memset(f, 0, sizeof(FrameQueue));
-    f->pktq_ = pktq;
-    f->max_size_ = FFMIN(max_size, kFrameQueueSize);
-    f->keep_last_ = !!keep_last;
-    for (i = 0; i < f->max_size_; i++) {
+    memset(frame_queue, 0, sizeof(FrameQueue));
+    frame_queue->packet_queue_ = packet_queue;
+    frame_queue->max_size_ = FFMIN(max_size, kFrameQueueSize);
+    frame_queue->keep_last_ = !!keep_last;
+    for (i = 0; i < frame_queue->max_size_; i++) {
         // 为 FrameQueue 中的 max_size 个 Frame 分配内存
         if (!(f->queue_[i].frame_ = av_frame_alloc())) {
             return AVERROR(ENOMEM);
