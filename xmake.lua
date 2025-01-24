@@ -6,6 +6,8 @@ set_defaultmode("debug")
 
 set_license("GPL-3.0")
 
+set_warnings("allextra")
+
 add_rules("mode.debug", "mode.release")
 
 add_requires("libsdl", { configs = { sdlmain = false, shared = true } })
