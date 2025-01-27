@@ -1,6 +1,6 @@
 #include <player/common.hpp>
 
-uint32_t MyRefreshTimerCallback(uint32_t interval, void* opaque) {
+uint32_t MyRefreshTimerCallback(uint32_t, void* opaque) {
     SDL_Event event;
     event.type = kFFRefreshEvent;
     event.user.data1 = opaque;
