@@ -1,6 +1,6 @@
-#include <player/read_thread.h>
+#include <player/read_thread.hpp>
 
-int OpenStreamComponent(VideoState* video_state, int stream_index);
+int OpenStreamComponent(VideoState* video_state, uint32_t stream_index);
 
 VideoState* OpenStream(std::string const& file_name) {
     int ret{0};
@@ -64,7 +64,7 @@ int ReadThread(void* arg) {
     }
 
     // 查找音频流和视频流
-    for (int i{0}; i < format_context->nb_streams; ++i) {
+    for (uint32_t i{0}; i < format_context->nb_streams; ++i) {
         AVStream* stream = format_context->streams[i];
         AVCodecParameters* codecpar = stream->codecpar;
         if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
@@ -135,11 +135,11 @@ int ReadThread(void* arg) {
     return 0;
 }
 
-int OpenStreamComponent(VideoState* video_state, int stream_index) {
+int OpenStreamComponent(VideoState* video_state, uint32_t stream_index) {
     int ret = -1;
 
     AVFormatContext* format_context{video_state->format_context_};
-    if (stream_index < 0 || stream_index >= format_context->nb_streams) {
+    if (stream_index >= format_context->nb_streams) {
         av_log(nullptr, AV_LOG_ERROR, "stream_index out of range\n");
         return -1;
     }

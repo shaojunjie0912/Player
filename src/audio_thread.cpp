@@ -1,4 +1,4 @@
-#include <player/audio_thread.h>
+#include <player/audio_thread.hpp>
 
 int AudioDecodeFrame(VideoState* video_state) {
     int ret{-1};

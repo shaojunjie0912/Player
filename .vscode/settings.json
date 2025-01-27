@@ -2,5 +2,18 @@
     "C_Cpp.intelliSenseEngine": "disabled",
     "clangd.arguments": [
         "--header-insertion=never",
+        "--compile-commands-dir=${workspaceFolder}/build"
     ],
+    "xmake.debugConfigType": "codelldb",
+    "xmake.compileCommandsDirectory": "${workspaceRoot}/build",
+    "xmake.debuggingTargetsArguments": {
+        "player": [
+            "${workspaceFolder}/data/k-on.mp4"
+        ]
+    },
+    "xmake.runningTargetsArguments": {
+        "player": [
+            "${workspaceFolder}/data/k-on.mp4"
+        ]
+    }
 }

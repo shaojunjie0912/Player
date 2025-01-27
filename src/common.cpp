@@ -1,10 +1,10 @@
-#include <player/common.h>
+#include <player/common.hpp>
 
-uint32_t MyRefreshTimerCallback(uint32_t interval, void* opaque) {
+uint32_t MyRefreshTimerCallback(uint32_t, void* opaque) {
     SDL_Event event;
     event.type = kFFRefreshEvent;
     event.user.data1 = opaque;
-    SDL_PushEvent(&event);  // 插入 SDL 时间队列
+    SDL_PushEvent(&event);  // 插入 SDL 事件队列
     return 0;
 }
 

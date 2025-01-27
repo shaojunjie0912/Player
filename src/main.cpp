@@ -1,5 +1,6 @@
-#include <player/read_thread.h>
+#include <fmt/core.h>
 
+#include <player/read_thread.hpp>
 #include <string>
 
 SDL_Window* window = nullptr;

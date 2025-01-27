@@ -1,7 +1,7 @@
 #pragma once
 
-#include <player/const.h>
-#include <player/core.h>
+#include <player/const.hpp>
+#include <player/core.hpp>
 
 // ==================  ==================
 
