@@ -1,8 +1,7 @@
 #pragma once
 
-extern "C" {
-#include <SDL2/SDL.h>
-}
+#include <player/ffmpeg.hpp>
+
 constexpr int kDefaultWidth = 960;
 constexpr int kDefaultHeight = 540;
 // constexpr int kScreenLeft = SDL_WINDOWPOS_CENTERED; // 窗口左上角的 x 坐标

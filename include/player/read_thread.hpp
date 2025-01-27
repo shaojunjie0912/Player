@@ -2,20 +2,11 @@
 
 #include <cmath>
 #include <cstdint>
-#include <string>
-
-extern "C" {
-#include <SDL2/SDL.h>
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/fifo.h>
-#include <libavutil/time.h>
-#include <libswresample/swresample.h>
-}
-
 #include <player/common.hpp>
 #include <player/const.hpp>
 #include <player/core.hpp>
+#include <player/ffmpeg.hpp>
+#include <string>
 
 // 视频线程
 #include <player/video_thread.hpp>

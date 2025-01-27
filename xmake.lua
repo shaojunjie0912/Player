@@ -10,9 +10,9 @@ set_warnings("allextra")
 
 add_rules("mode.debug", "mode.release")
 
-add_requires("libsdl", { configs = { sdlmain = false, shared = true } })
-add_requires("ffmpeg", { configs = { shared = true } })
-add_requires("fmt", { configs = { shared = true } })
+add_requires("libsdl")
+add_requires("ffmpeg")
+add_requires("fmt")
 
 
 target("player")

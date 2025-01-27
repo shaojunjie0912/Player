@@ -4,12 +4,8 @@
 #include <mutex>
 #include <string>
 
-extern "C" {
-#include <SDL2/SDL.h>
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/fifo.h>
-}
+//
+#include <player/ffmpeg.hpp>
 
 constexpr int kFrameQueueSize = 16;
 
